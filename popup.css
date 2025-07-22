@@ -1,28 +1,131 @@
-:root {
-    --background-color: #ffffff;
-    --text-color: #333333;
-    --border-color: #e0e0e0;
-    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --primary-color: #266DD3;
-    --primary-hover-color: #1e5ca7;
-    --danger-color: #dc3545;
-    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    width: 350px;
+    padding: 15px; 
+    background-color: #292a2c;
+    color: #f0f0f0;
+    box-sizing: border-box;
 }
 
-body {
-    font-family: var(--font-family);
-    width: 380px;
+* {
+    box-sizing: border-box;
+}
+
+h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+#image-count {
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: #c0c0c0;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #444;
+    margin: 15px 0;
+}
+
+#selected-images-list {
+    list-style: none;
     padding: 0;
     margin: 0;
-    background-color: #f4f6f8;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px; 
+    max-height: 220px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 12px;
 }
 
-.card {
-    background-color: var(--background-color);
-    border-radius: 12px;
-    box-shadow: var(--card-shadow);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+#selected-images-list li {
+    position: relative;
+    aspect-ratio: 1 / 1;
 }
-/* ... rest van de lichte layout styling ... */
+
+#selected-images-list img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid #555;
+}
+
+.remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 22px;
+    text-align: center;
+    padding: 0;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.remove-btn:hover {
+    background-color: rgba(255, 0, 0, 0.8);
+    transform: scale(1.1);
+}
+
+#selected-images-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#selected-images-list::-webkit-scrollbar-track {
+    background: #292a2c;
+    border-radius: 10px;
+}
+
+#selected-images-list::-webkit-scrollbar-thumb {
+    background: #6b6d70; 
+    border-radius: 10px;
+    border: 2px solid #292a2c;
+}
+
+#selected-images-list::-webkit-scrollbar-thumb:hover {
+    background: #85878a; 
+}
+
+button#send-data {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    background-color: #ffffff;
+    color: #292a2c;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+}
+
+button#send-data:hover:not(:disabled) {
+    background-color: #f0f0f0;
+}
+
+button#send-data:disabled {
+    background-color: #555;
+    color: #999;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+#status {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    min-height: 1.2em;
+    transition: color 0.3s;
+}

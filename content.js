@@ -79,8 +79,13 @@ async function scrapeCampspaceAsText() {
         pitches.forEach(pitch => {
             const pitchTitle = getText('.space-pitches--h3', pitch);
             const pitchPrice = getText('.space-pitches--type-price', pitch);
-            contentParts.push(`\n** ${pitchTitle.toUpperCase()} **`);
-            contentParts.push(pitchPrice);
+            
+            if (pitchTitle && pitchPrice) {
+                contentParts.push(`\n** ${pitchTitle.toUpperCase()} ** - ${pitchPrice}`);
+            } else if (pitchTitle) {
+                contentParts.push(`\n** ${pitchTitle.toUpperCase()} **`);
+            }
+
             const popupName = pitch.querySelector('[data-popup-name]')?.dataset.popupName;
             const popup = document.querySelector(`dialog[data-popup-name="${popupName}"]`);
             if (popup) {
@@ -112,8 +117,8 @@ async function scrapeCampspaceAsText() {
                     }
                 }
             } else {
-                 const pitchDescription = getText('.pitch-description', pitch);
-                 contentParts.push(pitchDescription);
+                const pitchDescription = getText('.pitch-description', pitch);
+                contentParts.push(pitchDescription);
             }
         });
     } else {
@@ -147,10 +152,10 @@ async function scrapeCampspaceAsText() {
         }
         const lastPageLink = pagination.querySelector('a[title="Laatste pagina"]');
         if (lastPageLink) {
-             try {
+            try {
                 const url = new URL(lastPageLink.href, window.location.origin);
                 totalPages = parseInt(url.searchParams.get('page'), 10) || 1;
-             } catch (e) { console.error("Kon 'Laatste pagina' link niet verwerken.", e); }
+            } catch (e) { console.error("Kon 'Laatste pagina' link niet verwerken.", e); }
         }
         const MAX_REVIEWS = 50;
         const REVIEWS_PER_PAGE = 10;
@@ -255,7 +260,7 @@ async function scrapeVipioAsText() {
         console.error("BGO Copilot: API fetch for reviews failed, scraping only visible reviews as a fallback.", error);
         const visibleReviews = document.querySelectorAll('section.reviews article.review');
         if (visibleReviews.length > 0) {
-             visibleReviews.forEach(reviewNode => allReviews.add(processReviewNode(reviewNode)));
+            visibleReviews.forEach(reviewNode => allReviews.add(processReviewNode(reviewNode)));
             contentParts.push(...Array.from(allReviews));
         } else {
             contentParts.push('Kon de reviews niet laden.');
@@ -265,74 +270,107 @@ async function scrapeVipioAsText() {
 }
 
 async function scrapeNatuurhuisjeAsText() {
-  const contentParts = [];
-  contentParts.push(`TITEL: ${getText('h1.nh-detail__header__title')}`);
-  contentParts.push(getText('h2.nh-detail__header__subtitle'));
-  contentParts.push(`TYPE: ${getText('.nh-detail__header__details')}`);
-  const features = getAllText('.nh-detail__header__features .nh-list__item');
-  contentParts.push(`KENMERKEN: ${features.join(' | ')}`);
-  contentParts.push('\n---\n');
-  const descriptionNode = document.querySelector('#nature_description_show_more [data-role="content"]');
-  if (descriptionNode) {
-    contentParts.push('OMSCHRIJVING:');
-    contentParts.push(descriptionNode.innerText.trim());
-  }
-  contentParts.push('\n---\n');
-  const facilitiesSection = document.querySelector('[data-role="facilities-section"]');
-  if (facilitiesSection) {
-    contentParts.push('FACILITEITEN:');
-    facilitiesSection.querySelectorAll('.nh-detail__content__facilities__bedroom').forEach(room => {
-        const roomName = getText('.nh-detail__content__facilities__bedroom__title', room);
-        const beds = getAllText('li', room).join(', ');
-        contentParts.push(`${roomName}: ${beds}`);
-    });
-    facilitiesSection.querySelectorAll('.nh-detail__content__facilities__category').forEach(cat => {
-      const categoryName = getText('strong', cat);
-      const items = getAllText('.nh-detail__content__facilities__category__list-item');
-      contentParts.push(`${categoryName}: ${items.join(', ')}`);
-    });
-  }
-  contentParts.push('\n---\n');
-  const optionalCostsTable = document.querySelector('.nh-detail__content__optional-costs table');
-  if (optionalCostsTable) {
-      contentParts.push('OPTIONELE KOSTEN:');
-      Array.from(optionalCostsTable.querySelectorAll('tr')).forEach(row => {
-          const description = getText('th', row).replace(/\n/g, ' ');
-          const price = getText('td', row);
-          contentParts.push(`- ${description}: ${price}`);
-      });
-  }
-  contentParts.push('\n---\n');
-  contentParts.push('BEOORDELINGEN:');
-  const houseId = document.querySelector('meta[id="house-id"]')?.content;
-  if (houseId) {
-    try {
-      const reviewApiUrl = `/api/houses/${houseId}/reviews?skip=0`;
-      const response = await fetch(reviewApiUrl);
-      const reviewsData = await response.json();
-      if (reviewsData && reviewsData.data && reviewsData.data.reviews && reviewsData.data.reviews.length > 0) {
-        const reviewsText = reviewsData.data.reviews.map(review =>
-          `Review door ${review.initials} (aankomst ${review.arrivalDate}):\nNatuur: ${review.natureCommentTranslated || review.natureComment}\nHuisje: ${review.houseCommentTranslated || review.houseComment}`
-        ).join('\n\n');
-        contentParts.push(reviewsText);
-      } else {
-        contentParts.push('Geen beoordelingen gevonden.');
-      }
-    } catch (error) {
-      console.error("BGO Copilot: Fout bij het ophalen van reviews via API:", error);
-      contentParts.push('Kon beoordelingen niet laden.');
+    const contentParts = [];
+    contentParts.push(`TITEL: ${getText('h1.nh-detail__header__title')}`);
+
+    const params = new URLSearchParams(window.location.search);
+    const arrivalStr = params.get('arrivalDate');
+    const departureStr = params.get('departureDate');
+
+    if (arrivalStr && departureStr) {
+        const priceElement = document.querySelector('span[data-testid="total-price"]');
+        if (priceElement) {
+            let totalText = priceElement.innerText.trim();
+            try {
+                const arrivalDate = new Date(arrivalStr);
+                const departureDate = new Date(departureStr);
+                const diffTime = Math.abs(departureDate - arrivalDate);
+                const numberOfNights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                const totalPriceRaw = priceElement.dataset.totalPrice || totalText.replace(/€\s*/, '').replace(',', '.');
+                const totalPrice = parseFloat(totalPriceRaw);
+
+                if (!isNaN(totalPrice) && numberOfNights > 0) {
+                    const pricePerNight = totalPrice / numberOfNights;
+                    const formattedPrice = `€ ${pricePerNight.toFixed(2).replace('.', ',')}`;
+                    contentParts.push(`VANAF PRIJS: ${formattedPrice} per nacht`);
+                } else {
+                    contentParts.push(`PRIJS: ${totalText}`);
+                }
+            } catch (e) {
+                console.error("BGO Copilot: Fout bij berekenen prijs per nacht voor Natuurhuisje", e);
+                contentParts.push(`PRIJS: ${totalText}`);
+            }
+        }
     }
-  } else {
-    contentParts.push('Kon huis-ID niet vinden voor reviews.');
-  }
-  contentParts.push('\n---\n');
-  const goodToKnowSection = document.querySelector('[data-role="good-to-know"]');
-  if (goodToKnowSection) {
-    contentParts.push('GOED OM TE WETEN:');
-    contentParts.push(goodToKnowSection.innerText.trim());
-  }
-  return contentParts.join('\n').replace(/\n\n+/g, '\n\n');
+
+    contentParts.push(getText('h2.nh-detail__header__subtitle'));
+    contentParts.push(`TYPE: ${getText('.nh-detail__header__details')}`);
+    const features = getAllText('.nh-detail__header__features .nh-list__item');
+    contentParts.push(`KENMERKEN: ${features.join(' | ')}`);
+    contentParts.push('\n---\n');
+    const descriptionNode = document.querySelector('#nature_description_show_more [data-role="content"]');
+    if (descriptionNode) {
+        contentParts.push('OMSCHRIJVING:');
+        contentParts.push(descriptionNode.innerText.trim());
+    }
+    contentParts.push('\n---\n');
+    const facilitiesSection = document.querySelector('[data-role="facilities-section"]');
+    if (facilitiesSection) {
+        contentParts.push('FACILITEITEN:');
+        facilitiesSection.querySelectorAll('.nh-detail__content__facilities__bedroom').forEach(room => {
+            const roomName = getText('.nh-detail__content__facilities__bedroom__title', room);
+            const beds = getAllText('li', room).join(', ');
+            contentParts.push(`${roomName}: ${beds}`);
+        });
+        facilitiesSection.querySelectorAll('.nh-detail__content__facilities__category').forEach(cat => {
+            const categoryName = getText('strong', cat);
+            const items = getAllText('.nh-detail__content__facilities__category__list-item', cat);
+            contentParts.push(`${categoryName}: ${items.join(', ')}`);
+        });
+    }
+    contentParts.push('\n---\n');
+    const optionalCostsTable = document.querySelector('.nh-detail__content__optional-costs table');
+    if (optionalCostsTable) {
+        contentParts.push('OPTIONELE KOSTEN:');
+        Array.from(optionalCostsTable.querySelectorAll('tr')).forEach(row => {
+            const description = getText('th', row).replace(/\n/g, ' ');
+            const price = getText('td', row);
+            contentParts.push(`- ${description}: ${price}`);
+        });
+    }
+    contentParts.push('\n---\n');
+    contentParts.push('BEOORDELINGEN:');
+    const houseId = document.querySelector('meta[id="house-id"]')?.content;
+    if (houseId) {
+        try {
+            const reviewApiUrl = `/api/houses/${houseId}/reviews?skip=0`;
+            const response = await fetch(reviewApiUrl);
+            const reviewsData = await response.json();
+            if (reviewsData && reviewsData.data && reviewsData.data.reviews && reviewsData.data.reviews.length > 0) {
+                const reviewsText = reviewsData.data.reviews.map(review =>
+                    `Review door ${review.initials} (aankomst ${review.arrivalDate}):\nNatuur: ${review.natureCommentTranslated || review.natureComment}\nHuisje: ${review.houseCommentTranslated || review.houseComment}`
+                ).join('\n\n');
+                contentParts.push(reviewsText);
+            } else {
+                contentParts.push('Geen beoordelingen gevonden.');
+            }
+        } catch (error) {
+            console.error("BGO Copilot: Fout bij het ophalen van reviews via API:", error);
+            contentParts.push('Kon beoordelingen niet laden.');
+        }
+    } else {
+        contentParts.push('Kon huis-ID niet vinden voor reviews.');
+    }
+    contentParts.push('\n---\n');
+    const goodToKnowSection = document.querySelector('[data-role="good-to-know"]');
+    if (goodToKnowSection) {
+        contentParts.push('GOED OM TE WETEN:');
+        contentParts.push(goodToKnowSection.innerText.trim());
+    }
+    return contentParts.join('\n').replace(/\n\n+/g, '\n\n');
 }
+
 
 // --- General functions for buttons and images ---
 
@@ -370,10 +408,10 @@ function getMediumQualityThumbnail(url) {
         return url.split('/').slice(0, -1).join('/') + '/width=200,height=200,fit=cover';
     }
     if (hostname.includes('booking.com') && url.includes('cf.bstatic.com')) {
-       return url.replace(/max\d+x\d+/g, 'max300');
+        return url.replace(/max\d+x\d+/g, 'max300');
     }
     if (hostname.includes('campspace.com') && url.includes('campspace.com/media')) {
-       return url.replace('/teaser/', '/medium/').replace('/detail/', '/medium/');
+        return url.replace('/teaser/', '/medium/').replace('/detail/', '/medium/');
     }
     return url;
 }

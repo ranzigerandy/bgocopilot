@@ -1,3 +1,4 @@
+
 document.addEventListener('DOMContentLoaded', () => {
     const sendButton = document.getElementById('send-data');
     const statusMessage = document.getElementById('status');
